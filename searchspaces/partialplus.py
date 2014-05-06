@@ -157,8 +157,8 @@ _BINARY_OPS = {'+': lambda x, y: x + y,
                '|': lambda x, y: x | y,
                '**': lambda x, y: x ** y,
                '//': lambda x, y: x // y,
-               '==': lambda x, y: x == y,
-               '!=': lambda x, y: x != y,
+               #'==': lambda x, y: x == y,
+               #'!=': lambda x, y: x != y,
                '>': lambda x, y: x > y,
                '<': lambda x, y: x < y,
                '>=': lambda x, y: x >= y,
@@ -444,11 +444,11 @@ class PartialPlus(_partial, Node):
     def __le__(self, other):
         return partial(_binary_arithmetic, self, other, '<=')
 
-    def __eq__(self, other):
-        return partial(_binary_arithmetic, self, other, '==')
+    # def __eq__(self, other):
+    #     return partial(_binary_arithmetic, self, other, '==')
 
-    def __ne__(self, other):
-        return partial(_binary_arithmetic, self, other, '!=')
+    # def __ne__(self, other):
+    #     return partial(_binary_arithmetic, self, other, '!=')
 
     def __gt__(self, other):
         return partial(_binary_arithmetic, self, other, '>')
