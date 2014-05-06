@@ -12,8 +12,6 @@ from functools import partial as _partial
 import warnings
 from itertools import izip, repeat
 
-import networkx as nx
-
 # TODO: support o_len functionality from old Apply nodes
 
 
@@ -101,50 +99,186 @@ def as_partialplus(p):
         return Literal(p)
 
 
+class UniqueStack(object):
+    """
+    Implementation of a stack (using a deque) that also checks pushed elements
+    for uniqueness.
+    """
+    def __init__(self):
+        self._deque = deque()
+        self._members = set()
+
+    def push(self, elem):
+        """
+        Push an element onto the stack.
+
+        Parameters
+        ----------
+        elem : object
+
+        Raises
+        ------
+        KeyError
+            If `elem` already exists in this stack.
+        """
+
+        if elem in self._members:
+            raise KeyError(str(elem))
+        else:
+            self._deque.append(elem)
+            self._members.add(elem)
+
+    def pop(self):
+        """
+        Pop the topmost element off the stack.
+
+        Returns
+        -------
+        elem : object
+            The top-most element from the stack (removed).
+
+        Raises
+        ------
+        IndexError
+            If the stack is empty.
+        """
+        try:
+            elem = self._deque.pop()
+            self._members.remove(elem)
+        except IndexError:
+            raise IndexError("pop from an empty %s" % self.__class__.__name__)
+        return elem
+
+    def pop_until(self, elem):
+        """
+        Pop and discard items until the head of the stack is the
+        object `elem`.
+
+        Parameters
+        ----------
+        elem : object
+            The desired element at the head of the stack.
+
+        Raises
+        ------
+        ValueError
+            If the stack is emptied before finding `elem`.
+        """
+        while len(self._deque) > 0 and self._deque[-1] is not elem:
+            self.pop()
+        if len(self._deque) == 0:
+            raise ValueError("never found sentinel element")
+
+    def __len__(self):
+        return len(self._deque)
+
+
+def _traversal_helper(root, build_inverted=False):
+    """
+    Helper function for `depth_first_traversal` and `topological_sort`.
+
+    Parameters
+    ----------
+    root : Node
+    build_inverted : boolean, optional
+        If `True`, after all nodes have been yielded, yield a dictionary
+        containing an inverted index.
+
+    Returns
+    -------
+    gen : generator object
+        A generator producing nodes from the graph, in a depth-first order.
+        If `build_inverted` is True then the last item it yields is a
+        dictionary containing an inverted index (mapping nodes to their
+        parents).
+
+    Raises
+    ------
+    ValueError
+        If the graph contains a directed cycle.
+    """
+    assert isinstance(root, Node)
+    visited = {}
+    to_visit = deque()
+    # TODO: optimize out UniqueStack class by just doing what it would do
+    # in the function body.
+    path = UniqueStack()
+    # None = our sentinel value for "no parent".
+    path.push(None)
+    to_visit.append((None, root))
+    while len(to_visit) > 0:
+        parent, node = to_visit.pop()
+        path.pop_until(parent)
+        try:
+            path.push(node)
+        except KeyError:
+            raise ValueError("call graph contains a directed cycle")
+        if node not in visited:
+            if build_inverted:
+                visited.setdefault(node, set()).add(parent)
+            else:
+                visited[node] = True
+            yield node
+            if isinstance(node, PartialPlus):
+                children = node.args + (tuple(node.keywords.values())
+                                        if node.keywords is not None else ())
+                to_visit.extend((node, c) for c in children)
+        elif build_inverted:
+            visited[node].add(parent)
+    if build_inverted:
+        visited[root].remove(None)
+        yield visited
+
+
 def depth_first_traversal(root):
     """
     Perform a depth-first traversal of a graph of PartialPlus objects.
 
     Parameters
     ----------
-    root : object
-        A `Node` object.
+    root : Node
 
     Returns
     -------
-    sequence : list
-        A list of `functools.partial` nodes from the graph,
-        in a depth-first order.
+    gen : generator object
+        A generator producing nodes from the graph, in a depth-first order.
+
+    Raises
+    ------
+    ValueError
+        If the graph contains a directed cycle.
     """
-    assert isinstance(root, Node)
-    visited = {}
-    to_visit = deque()
-    to_visit.append(root)
-    while len(to_visit) > 0:
-        node = to_visit.pop()
-        if node not in visited:
-            visited[node] = True
-            yield node
-            if isinstance(node, PartialPlus):
-                children = node.args + (tuple(node.keywords.values())
-                                        if node.keywords is not None else ())
-                for c in children:
-                    to_visit.append(c)
+    return _traversal_helper(root)
 
 
-def topological_sort(expr):
+def topological_sort(root):
     """
-    Return the nodes of `expr` sub-tree in topological order.
+    Perform a topological sort of a graph of PartialPlus objects.
 
-    Raises networkx.NetworkXUnfeasible if subtree contains cycle.
+    Parameters
+    ----------
+    root : Node
+
+    Returns
+    -------
+    gen : generator object
+        A generator producing nodes from the graph, in a topological order.
+
+    Raises
+    ------
+    ValueError
+        If the graph contains a directed cycle.
     """
-    # TODO: remove networkx dependency. It should be short enough.
-    G = nx.DiGraph()
-    for node in depth_first_traversal(expr):
-        G.add_edges_from([(n_in, node) for n_in in node.inputs()])
-    order = nx.topological_sort(G)
-    assert order[-1] == expr
-    return order
+    candidates = deque(_traversal_helper(root, build_inverted=True))
+    dependencies = candidates.pop()
+    visited = set()
+    while candidates:
+        proposed = candidates.popleft()
+        if dependencies[proposed].difference(visited):
+            candidates.append(proposed)
+        else:
+            visited.add(proposed)
+            yield proposed
 
 
 _BINARY_OPS = {'+': lambda x, y: x + y,

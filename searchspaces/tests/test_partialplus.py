@@ -1,7 +1,7 @@
 #from functools import partial
 from searchspaces.partialplus import partial, Literal
 from searchspaces.partialplus import evaluate
-from searchspaces.partialplus import depth_first_traversal
+from searchspaces.partialplus import depth_first_traversal, topological_sort
 from searchspaces.partialplus import as_partialplus as as_pp
 
 
@@ -118,28 +118,82 @@ def test_star_kwargs():
 
 
 def test_depth_first_traversal():
-    def add(x, y):
-        return x + y
-
-    def index_of(l, e):
-        """index() using is for comparison"""
-        for i, v in enumerate(l):
-            if v is e:
-                return i
-
+    # p1 must appear after either p2 or p3, but not necessarily after both.
     p1 = partial(float, 5.0)
-    p2 = partial(add, p1, 0.5)
-    p3 = partial(add, p1, p2)
-    p4 = partial(add, p2, p3)
+    # p2 must appear after either p3 or p4, but not necessarily after both.
+    p2 = p1 + 0.5
+    p3 = p1 / p2
+    p4 = p2 * p3
     p5 = partial(int, p4)
     traversal = list(depth_first_traversal(p5))
-    assert len(traversal) == 7
-    assert index_of(traversal, p5) < index_of(traversal, p4)
-    assert index_of(traversal, p4) < index_of(traversal, p3)
-    assert index_of(traversal, p4) < index_of(traversal, p2)
-    assert index_of(traversal, p2) < index_of(traversal, p1)
+    assert traversal.index(p5) == 0
+    assert traversal.index(p4) == 1
+    assert traversal.index(p3) > traversal.index(p4)
+    assert (traversal.index(p2) > traversal.index(p3) or
+            traversal.index(p2) > traversal.index(p4))
+    assert (traversal.index(p1) > traversal.index(p2) or
+            traversal.index(p1) > traversal.index(p3))
+
+
+def test_topological_sort():
+    # p1 must appear before BOTH p2 and p3.
+    p1 = partial(float, 5)
+    # p2 must appear before BOTH p3 and p4.
+    p2 = p1 + 0.5
+    p3 = p1 / p2
+    p4 = p2 * p3
+    p5 = partial(int, p4)
+    toposort = list(topological_sort(p5))
+    assert toposort.index(p5) == 0
+    assert toposort.index(p4) == 1
+    assert (toposort.index(p1) > toposort.index(p2)
+            and toposort.index(p1) > toposort.index(p3))
+    assert (toposort.index(p2) > toposort.index(p3)
+            and toposort.index(p2) > toposort.index(p4))
+    assert toposort.index(Literal(5)) > toposort.index(p1)
+    assert toposort.index(Literal(0.5)) > toposort.index(p2)
+
+
+def test_cycle_detection():
+    def assert_raised(graph, fn):
+        raised = False
+        try:
+            list(fn(graph))
+        except ValueError as v:
+            raised = True
+            print v.args
+        assert raised
+
+    p1 = partial(float, 5)
+    p2 = partial(int, p1)
+    p3 = partial(float, p2)
+    p4 = partial(int, p3)
+    p1.keywords['not_a_real_keyword'] = p1
+    # Simple cycle on a single node.
+    assert_raised(p1, depth_first_traversal)
+    assert_raised(p1, topological_sort)
+    # Detect a single node cycle when it isn't the root.
+    assert_raised(p2, depth_first_traversal)
+    assert_raised(p2, topological_sort)
+    # Larger cycle.
+    del p1.keywords['not_a_real_keyword']
+    p1.keywords['not_a_real_keyword_either'] = p2
+    assert_raised(p4, depth_first_traversal)
+    assert_raised(p4, topological_sort)
+    p1.keywords['not_a_real_keyword_either'] = p3
+    assert_raised(p4, depth_first_traversal)
+    assert_raised(p4, topological_sort)
+    p1.keywords['not_a_real_keyword_either'] = p4
+    assert_raised(p4, depth_first_traversal)
+    assert_raised(p4, topological_sort)
+    del p1.keywords['not_a_real_keyword_either']
+    # Test with a positional argument.
+    p1.append_arg(p4)
+    assert_raised(p4, depth_first_traversal)
+    assert_raised(p4, topological_sort)
 
 
 if __name__ == "__main__":
     test_switch()
     test_switch_range()
+    test_topological_sort()
