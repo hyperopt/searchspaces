@@ -217,11 +217,8 @@ class UniqueStack(object):
         IndexError
             If the stack is empty.
         """
-        try:
-            elem = self._deque.pop()
-            self._members.remove(elem)
-        except IndexError:
-            raise IndexError("pop from an empty %s" % self.__class__.__name__)
+        elem = self._deque.pop()
+        self._members.remove(elem)
         return elem
 
     def pop_until(self, elem):
