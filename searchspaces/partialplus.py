@@ -476,7 +476,7 @@ def _param_assignment(pp):
 class Node(object):
     def clone(self):
         bindings = {}
-        nodes = topological_sort(self)
+        nodes = reversed(list(topological_sort(self)))
         for node in nodes:
             if isinstance(node, Literal):
                 bindings[node] = Literal(node.value)
