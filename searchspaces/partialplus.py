@@ -6,6 +6,8 @@ __authors__ = "David Warde-Farley"
 __license__ = "3-clause BSD License"
 __contact__ = "github.com/hyperopt/hyperopt"
 
+# Keep this to only standard library imports so that this is droppable in
+# another code-base for re-use.
 from collections import deque
 import compiler
 from functools import partial as _partial
@@ -15,24 +17,39 @@ from itertools import izip, repeat
 # TODO: support o_len functionality from old Apply nodes
 
 
-def _list_node(*args):
+def is_tuple_node(node):
+    return hasattr(node, 'func') and node.func is make_tuple
+
+
+def is_list_node(node):
+    return hasattr(node, 'func') and node.func is make_list
+
+
+def is_pos_args_node(node):
+    return (hasattr(node, 'func') and node.func is call_with_list_of_pos_args)
+
+
+def make_list(*args):
     """
     Wrapper for the builtin `list()` that calls it on *args.
 
     Handles tuples encountered by as_partialplus, so that we don't
-    have to have special logic for recursing on
+    have to have special logic for recursing on lists.
     """
     return list(args)
 
 
-def _tuple_node(*args):
+def make_tuple(*args):
     """
     Wrapper for the builtin `tuple()` that calls it on *args.
+
+    Handles tuples encountered by as_partialplus, so that we don't
+    have to have special logic for recursing on tuples.
     """
     return tuple(args)
 
 
-def _call_with_list_of_pos_args(f, *args):
+def call_with_list_of_pos_args(f, *args):
     return f(args)
 
 
@@ -84,9 +101,9 @@ def as_partialplus(p):
     # not subclasses.
     elif type(p) in (list, tuple):
         if type(p) == list:
-            func = _list_node
+            func = make_list
         else:
-            func = _tuple_node
+            func = make_tuple
         return PartialPlus(func, *(as_partialplus(e) for e in p))
     # Definitely want this to work for OrderedDicts.
     elif isinstance(p, dict):
@@ -94,7 +111,7 @@ def as_partialplus(p):
         # TODO: recurse on keys?
         args = [Literal(p.__class__)] + [as_partialplus((k, v))
                                          for k, v in p.iteritems()]
-        return PartialPlus(_call_with_list_of_pos_args, *args)
+        return PartialPlus(call_with_list_of_pos_args, *args)
     else:
         return Literal(p)
 
@@ -168,9 +185,6 @@ class UniqueStack(object):
             self.pop()
         if len(self._deque) == 0:
             raise ValueError("never found sentinel element")
-
-    def __len__(self):
-        return len(self._deque)
 
 
 def _traversal_helper(root, build_inverted=False):
@@ -269,6 +283,8 @@ def topological_sort(root):
     ValueError
         If the graph contains a directed cycle.
     """
+    # TODO: make this more efficient and natively support reverse sort
+    # (probably by getting two dictionaries).
     candidates = deque(_traversal_helper(root, build_inverted=True))
     dependencies = candidates.pop()
     visited = set()
@@ -728,7 +744,7 @@ def evaluate(p, instantiate_call=None, bindings=None):
     if p.func == _getitem:
         obj, index = p.args
         if (isinstance(obj, _partial)
-                and obj.func in (_list_node, _tuple_node)):
+                and obj.func in (make_list, make_tuple)):
             index_val = evaluate(index, instantiate_call, bindings)
             # TODO: is_iterable
             elem_val = obj.args[index_val]

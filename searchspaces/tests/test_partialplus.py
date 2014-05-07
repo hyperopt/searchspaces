@@ -1,4 +1,3 @@
-#from functools import partial
 from searchspaces.partialplus import partial, Literal
 from searchspaces.partialplus import evaluate
 from searchspaces.partialplus import depth_first_traversal, topological_sort
@@ -117,6 +116,33 @@ def test_star_kwargs():
     }
 
 
+def test_tuple():
+    def add(x, y):
+        return x + y
+
+    x = as_pp(((3, partial(add, 2, 3)), partial(add, 5, 7), partial(float, 9)))
+    y = evaluate(x)
+    assert y == ((3, 5), 12, 9.0)
+    assert isinstance(y[2], float)
+
+
+def test_list():
+    def sub(x, y):
+        return x - y
+
+    x = as_pp(((3, partial(sub, 2, 3)), partial(sub, 5, 7), partial(float, 9)))
+    y = evaluate(x)
+    assert y == ((3, -1), -2, 9.0)
+    assert isinstance(y[2], float)
+
+
+def test_dict():
+    def mod(x, y):
+        return x % y
+    x = as_pp({5: partial(mod, 5, 3), 3: (7, 9), 4: [partial(mod, 9, 4)]})
+    y = evaluate(x)
+    assert y == {5: 2, 3: (7, 9), 4: [1]}
+
 def test_depth_first_traversal():
     # p1 must appear after either p2 or p3, but not necessarily after both.
     p1 = partial(float, 5.0)
@@ -161,7 +187,6 @@ def test_cycle_detection():
             list(fn(graph))
         except ValueError as v:
             raised = True
-            print v.args
         assert raised
 
     p1 = partial(float, 5)
