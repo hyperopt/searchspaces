@@ -513,6 +513,7 @@ class Literal(Node):
     func = None
     args = None
     keywords = None
+    __slots__ = ['value']
 
     def __init__(self, value):
         self._value = value
