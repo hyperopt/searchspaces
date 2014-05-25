@@ -218,6 +218,15 @@ def test_cycle_detection():
     assert_raised(p4, topological_sort)
 
 
+def test_two_objects():
+    class Foo(object):
+        pass
+    p = partial(Foo)
+    q = as_pp([p, [0, 1, p], [(p,)]])
+    r = evaluate(q)
+    assert r[0] is r[1][-1]
+    assert r[0] is r[2][0][0]
+
 if __name__ == "__main__":
     test_switch()
     test_switch_range()
