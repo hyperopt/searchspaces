@@ -4,7 +4,7 @@ from nose import SkipTest
 
 def skip_if_no_module(name):
     """
-    W
+    Decorator that skips a test if `name` cannot be imported.
 
     Parameters
     ----------
