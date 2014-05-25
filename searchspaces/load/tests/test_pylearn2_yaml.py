@@ -1,18 +1,22 @@
 import os
 import tempfile
+from searchspaces.test_utils import skip_if_no_module
 from searchspaces import evaluate
-from searchspaces.load.pylearn2_yaml import (
-    append_yaml_src, append_yaml_callback, proxy_to_partialplus,
-    load, load_path
-)
-from pylearn2.config.yaml_parse import Proxy, do_not_recurse
-
+try:
+    from searchspaces.load.pylearn2_yaml import (
+        append_yaml_src, append_yaml_callback, proxy_to_partialplus,
+        load, load_path
+    )
+    from pylearn2.config.yaml_parse import Proxy, do_not_recurse
+except ImportError:
+    pass
 
 class Foo(object):
     def __init__(self, x=None):
         self.x = x
 
 
+@skip_if_no_module('pylearn2')
 def test_proxy_to_partialplus():
     # Use proxy_callback=None to test without YAML-appending.
     pp = proxy_to_partialplus(Proxy(callable=dict, positionals=(),
@@ -21,6 +25,7 @@ def test_proxy_to_partialplus():
     assert evaluate(pp) == {'x': [5, 3, 2]}
 
 
+@skip_if_no_module('pylearn2')
 def test_proxy_to_partialplus_literal_callback():
     def baz(x):
         if isinstance(x, int):
@@ -34,6 +39,7 @@ def test_proxy_to_partialplus_literal_callback():
     assert evaluate(pp)['x'] == 10
 
 
+@skip_if_no_module('pylearn2')
 def test_append_yaml_src():
     # Test that the append doesn't trigger an AttributeError on builtins.
     raised = False
@@ -48,6 +54,7 @@ def test_append_yaml_src():
     assert result.yaml_src == "bloop bloop bloop"
 
 
+@skip_if_no_module('pylearn2')
 def test_append_yaml_callback():
     pfail = Proxy(callable=dict, positionals=(), keywords={'value': 5},
                   yaml_src="test_value_1")
@@ -64,6 +71,7 @@ def test_append_yaml_callback():
     assert test.yaml_src == "test_value_2"
 
 
+@skip_if_no_module('pylearn2')
 def test_preprocessing():
     try:
         os.environ['FOO'] = 'abcdef'
@@ -94,6 +102,7 @@ def test_preprocessing():
     assert p['x'] == '${BAZ}'
 
 
+@skip_if_no_module('pylearn2')
 def test_do_not_recurse():
     proxy = Proxy(callable=do_not_recurse, positionals=(),
                   keywords={'value': Proxy(None, None, None, None)},
@@ -101,12 +110,14 @@ def test_do_not_recurse():
     assert isinstance(evaluate(proxy_to_partialplus(proxy)), Proxy)
 
 
+@skip_if_no_module('pylearn2')
 def test_identical_proxy_identical_partialplus():
     proxy = Proxy(lambda: None, None, None, None)
     pp = proxy_to_partialplus([{'a': proxy}, proxy], proxy_callback=None)
     assert pp.args[0].args[1].args[1] is pp.args[1]
 
 
+@skip_if_no_module('pylearn2')
 def test_load():
     src = '!obj:searchspaces.load.tests.test_pylearn2_yaml.Foo {x: 5}\n'
     pp = load(src)
@@ -120,6 +131,7 @@ def test_load():
     assert p.x == 'abcdef'
 
 
+@skip_if_no_module('pylearn2')
 def test_load_path():
     src = '!obj:searchspaces.load.tests.test_pylearn2_yaml.Foo {x: 5}\n'
     try:
