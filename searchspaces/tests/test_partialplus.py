@@ -1,5 +1,5 @@
 from searchspaces.partialplus import partial, Literal
-from searchspaces.partialplus import evaluate
+from searchspaces.partialplus import evaluate, variable
 from searchspaces.partialplus import depth_first_traversal, topological_sort
 from searchspaces.partialplus import as_partialplus as as_pp
 
@@ -226,6 +226,20 @@ def test_two_objects():
     r = evaluate(q)
     assert r[0] is r[1][-1]
     assert r[0] is r[2][0][0]
+
+
+def test_variable_substitution():
+    x = variable(name='x', value_type=int)
+    y = variable(name='y', value_type=float)
+    p = as_pp({3: x, x:[y, [y]], y:4})
+    # Currently no type-checking. This will fail when we add it and need to be
+    # updated.
+    e = evaluate(p, x='hey', y=5)
+    assert e[3] == 'hey'
+    assert e['hey'] == [5, [5]]
+    assert e[5] == 4
+
+
 
 if __name__ == "__main__":
     test_switch()
