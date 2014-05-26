@@ -196,7 +196,7 @@ def test_cycle_detection():
         raised = False
         try:
             list(fn(graph))
-        except ValueError as v:
+        except ValueError:
             raised = True
         assert raised
 
@@ -242,14 +242,13 @@ def test_two_objects():
 def test_variable_substitution():
     x = variable(name='x', value_type=int)
     y = variable(name='y', value_type=float)
-    p = as_pp({3: x, x:[y, [y]], y:4})
+    p = as_pp({3: x, x: [y, [y]], y: 4})
     # Currently no type-checking. This will fail when we add it and need to be
     # updated.
     e = evaluate(p, x='hey', y=5)
     assert e[3] == 'hey'
     assert e['hey'] == [5, [5]]
     assert e[5] == 4
-
 
 
 if __name__ == "__main__":
