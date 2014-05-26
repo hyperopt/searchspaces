@@ -1,3 +1,4 @@
+from nose import SkipTest
 from collections import OrderedDict
 from searchspaces.partialplus import partial, Literal
 from searchspaces.partialplus import evaluate, variable
@@ -52,6 +53,24 @@ def test_switch_range():
 
     plist = as_pp((-1, 0, 1, partial(dont_eval)))
     assert (-1, 0, 1) == evaluate(plist[:3])
+
+
+def test_getitem_dict():
+    """Test that getitem works on a dict."""
+    v = evaluate(as_pp({'a': partial(float, '3'), 'b': 3})['a'])
+    assert v == 3.0
+
+
+def test_switch_dict():
+    """Test that switch works with dicts."""
+    raise SkipTest()  # For now, TODO fixme
+    def dont_eval():
+        # -- This function body should never be evaluated
+        #    because we only need the 0'th element of `plist`
+        assert 0, 'Evaluate does not need this, should not eval'
+
+    r = evaluate(as_pp({'a': partial(dont_eval), 'b': 3})['b'])
+    assert r == 3
 
 
 def test_arg():
