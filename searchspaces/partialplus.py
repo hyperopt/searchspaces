@@ -65,7 +65,6 @@ def variable_node(*args, **kwargs):
     -----
     By convention we store everything in kwargs.
     """
-    assert len(args) == 0
 
 
 def call_with_list_of_pos_args(f, *args):
