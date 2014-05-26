@@ -536,10 +536,6 @@ class Literal(Node):
     def value(self):
         return self._value
 
-    @property
-    def name(self):
-        return None
-
 
 class PartialPlus(_partial, Node):
     """
@@ -613,12 +609,6 @@ class PartialPlus(_partial, Node):
     def __le__(self, other):
         return partial(_binary_arithmetic, self, other, '<=')
 
-    # def __eq__(self, other):
-    #     return partial(_binary_arithmetic, self, other, '==')
-
-    # def __ne__(self, other):
-    #     return partial(_binary_arithmetic, self, other, '!=')
-
     def __gt__(self, other):
         return partial(_binary_arithmetic, self, other, '>')
 
@@ -665,15 +655,6 @@ class PartialPlus(_partial, Node):
         warnings.warn("Use .args, not .pos_args")
         return self.args
 
-    @property
-    def name(self):
-        # TODO: should we rewrite the name matching stuff in terms of function
-        # identity?
-        if hasattr(self.func, '__name__'):
-            return self.func.__name__
-        else:
-            return self.func.func_name
-
     def inputs(self):
         # TODO: make this a property
         return self.args + (tuple(self.keywords.itervalues())
@@ -683,13 +664,6 @@ class PartialPlus(_partial, Node):
     def arg(self):
         # TODO: bindings
         return _param_assignment(self)
-
-    def replace_input(self, old_node, new_node):
-        new_args = tuple(new_node if obj is old_node else obj
-                         for obj in self.args)
-        new_keywords = [(key, new_node) if val is old_node else (key, val)
-                        for key, val in self.keywords.iteritems()]
-        return partial(self.func, *new_args, **new_keywords)
 
     @property
     def keywords(self):
@@ -710,9 +684,6 @@ class PartialPlus(_partial, Node):
 
     def append_arg(self, arg):
         self._args = self._args + (arg,)
-
-    def extend_args(self, args):
-        self._args = self._args + tuple(args)
 
 
 def variable(name, value_type, minimum=None, maximum=None, default=None,
