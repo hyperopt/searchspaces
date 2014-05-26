@@ -29,6 +29,10 @@ def is_list_node(node):
     return hasattr(node, 'func') and node.func is make_list
 
 
+def is_sequence_node(node):
+    return is_tuple_node(node) or is_list_node(node)
+
+
 def is_pos_args_node(node):
     return (hasattr(node, 'func') and node.func is call_with_list_of_pos_args)
 
@@ -812,8 +816,7 @@ def _evaluate(p, instantiate_call=None, bindings=None):
     # only evaluate the element(s) of the list that we need.
     if p.func == _getitem:
         obj, index = p.args
-        if (isinstance(obj, _partial)
-                and obj.func in (make_list, make_tuple)):
+        if isinstance(obj, _partial) and is_sequence_node(obj):
             index_val = recurse(index)
             elem_val = obj.args[index_val]
             if isinstance(index_val, slice):  # TODO: something more robust?
