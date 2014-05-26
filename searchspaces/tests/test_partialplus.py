@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from searchspaces.partialplus import partial, Literal
 from searchspaces.partialplus import evaluate, variable
 from searchspaces.partialplus import depth_first_traversal, topological_sort
@@ -142,6 +143,16 @@ def test_dict():
     x = as_pp({5: partial(mod, 5, 3), 3: (7, 9), 4: [partial(mod, 9, 4)]})
     y = evaluate(x)
     assert y == {5: 2, 3: (7, 9), 4: [1]}
+
+
+def test_ordered_dict():
+    def mod(x, y):
+        return x % y
+    x = as_pp(OrderedDict({5: partial(mod, 5, 3), 3: (7, 9),
+                           4: [partial(mod, 9, 4)]}))
+    y = evaluate(x)
+    assert y == {5: 2, 3: (7, 9), 4: [1]}
+
 
 def test_depth_first_traversal():
     # p1 must appear after either p2 or p3, but not necessarily after both.
