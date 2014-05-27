@@ -11,6 +11,7 @@ try:
 except ImportError:
     pass
 
+
 class Foo(object):
     def __init__(self, x=None):
         self.x = x
