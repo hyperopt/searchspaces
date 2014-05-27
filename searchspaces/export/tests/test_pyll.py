@@ -1,14 +1,20 @@
 from searchspaces.partialplus import partial, as_partialplus, evaluate
-from searchspaces.export.pyll import as_pyll
-from hyperopt.pyll import rec_eval, scope
+from searchspaces.test_utils import skip_if_no_module
+try:
+    from searchspaces.export.pyll import as_pyll
+    from hyperopt.pyll import rec_eval, scope
+except ImportError:
+    pass
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_tuple():
     x = as_partialplus((6, 9, 4))
     y = as_pyll(x)
     assert evaluate(x) == rec_eval(y)
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_list():
     x = as_partialplus([5, 3, 9])
     y = as_pyll(x)
@@ -16,6 +22,7 @@ def test_pyll_list():
     assert evaluate(x) == list(rec_eval(y))
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_list_tuple_nested():
     x = as_partialplus([[5, 3, (5, 3)], (4, 5)])
     y = as_pyll(x)
@@ -25,6 +32,7 @@ def test_pyll_list_tuple_nested():
     assert evaluate(x) == [list(val_y[0]), val_y[1]]
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_func():
     # N.B. Only uses stuff that's already in the SymbolTable.
     x = partial(float, 5)
@@ -32,12 +40,14 @@ def test_pyll_func():
     assert evaluate(x) == rec_eval(y)
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_nested_func():
     x = partial(float, partial(int, 5.5))
     y = as_pyll(x)
     assert evaluate(x) == rec_eval(y)
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_deeply_nested_func():
     # N.B. uses stuff that isn't in the SymbolTable yet, must remove.
     try:
@@ -54,6 +64,7 @@ def test_pyll_deeply_nested_func():
         scope.undefine(my_add)
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_dict():
         x = as_partialplus({'x': partial(float,
                                          partial(float,
@@ -65,6 +76,7 @@ def test_dict():
         assert evaluate(x) == rec_eval(y)
 
 
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_scope_doesnt_overwrite():
     raised = False
     try:
