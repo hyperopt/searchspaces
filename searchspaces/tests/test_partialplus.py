@@ -1,8 +1,29 @@
 from collections import OrderedDict
+import operator
 from searchspaces.partialplus import partial, Literal
-from searchspaces.partialplus import evaluate, variable
+from searchspaces.partialplus import evaluate, variable, is_indexable
 from searchspaces.partialplus import depth_first_traversal, topological_sort
 from searchspaces.partialplus import as_partialplus as as_pp
+
+
+def test_is_indexable():
+    """Tests is_indexable works as expected."""
+    # We only test cases where the node function is getitem, since that's
+    # assumed as a precondition.
+    node = partial(operator.getitem, [4, 2], 1)
+    assert is_indexable(node)
+    node = partial(operator.getitem, {4: 2}, 1)
+    assert is_indexable(node)
+    # Malformed getitem nodes.
+    node = partial(operator.getitem, {4: 2}, 1, 3)
+    assert not is_indexable(node)
+    node = partial(operator.getitem, [5, 3, 9], 1, 3)
+    assert not is_indexable(node)
+    node = partial(operator.getitem, [5, 3, 9], 1, k=4)
+    assert not is_indexable(node)
+    # Not a sequence or a dict-like.
+    node = partial(operator.getitem, 5, 3)
+    assert not is_indexable(node)
 
 
 def test_arithmetic():
