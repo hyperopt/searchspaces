@@ -11,6 +11,7 @@ __contact__ = "github.com/hyperopt/hyperopt"
 from collections import deque
 import compiler
 from functools import partial as _partial
+import operator
 import warnings
 from itertools import izip, repeat
 
@@ -327,44 +328,6 @@ def topological_sort(root):
             yield proposed
 
 
-_BINARY_OPS = {'+': lambda x, y: x + y,
-               '-': lambda x, y: x - y,
-               '*': lambda x, y: x * y,
-               '/': lambda x, y: x / y,
-               '%': lambda x, y: x % y,
-               '^': lambda x, y: x ^ y,
-               '&': lambda x, y: x & y,
-               '|': lambda x, y: x | y,
-               '**': lambda x, y: x ** y,
-               '//': lambda x, y: x // y,
-               #'==': lambda x, y: x == y,
-               #'!=': lambda x, y: x != y,
-               '>': lambda x, y: x > y,
-               '<': lambda x, y: x < y,
-               '>=': lambda x, y: x >= y,
-               '<=': lambda x, y: x <= y,
-               '<<': lambda x, y: x << y,
-               '>>': lambda x, y: x >> y,
-               'and': lambda x, y: x and y,
-               'or': lambda x, y: x or y}
-
-_UNARY_OPS = {'+': lambda x: +x,
-              '-': lambda x: -x,
-              '~': lambda x: ~x}
-
-
-def _binary_arithmetic(x, y, op):
-    return _BINARY_OPS[op](x, y)
-
-
-def _unary_arithmetic(x, op):
-    return _UNARY_OPS[op](x)
-
-
-def _getitem(obj, item):
-    return obj[item]
-
-
 class MissingArgument(object):
     """Object to represent a missing argument to a function application
     """
@@ -531,6 +494,8 @@ class Literal(Node):
         self._value = value
 
     def __gt__(self, other):
+        if not hasattr(other, 'value'):
+            return False
         return self.value > other.value
 
     def __lt__(self, other):
@@ -573,19 +538,19 @@ class PartialPlus(_partial, Node):
                         partial.__name__)
 
     def __add__(self, other):
-        return partial(_binary_arithmetic, self, other, '+')
+        return partial(operator.add, self, other)
 
     def __sub__(self, other):
-        return partial(_binary_arithmetic, self, other, '-')
+        return partial(operator.sub, self, other)
 
     def __mul__(self, other):
-        return partial(_binary_arithmetic, self, other, '*')
+        return partial(operator.mul, self, other)
 
     def __floordiv__(self, other):
-        return partial(_binary_arithmetic, self, other, '//')
+        return partial(operator.floordiv, self, other)
 
     def __mod__(self, other):
-        return partial(_binary_arithmetic, self, other, '%')
+        return partial(operator.mod, self, other)
 
     def __divmod__(self, other):
         return partial(divmod, self, other)
@@ -594,43 +559,43 @@ class PartialPlus(_partial, Node):
         return partial(pow, self, other, modulo)
 
     def __lshift__(self, other):
-        return partial(_binary_arithmetic, self, other, '<<')
+        return partial(operator.lshift, self, other)
 
     def __rshift__(self, other):
-        return partial(_binary_arithmetic, self, other, '>>')
+        return partial(operator.rshift, self, other)
 
     def __and__(self, other):
-        return partial(_binary_arithmetic, self, other, '&')
+        return partial(operator.and_, self, other)
 
     def __xor__(self, other):
-        return partial(_binary_arithmetic, self, other, '^')
+        return partial(operator.xor, self, other)
 
     def __or__(self, other):
-        return partial(_binary_arithmetic, self, other, '|')
+        return partial(operator.or_, self, other)
 
     def __div__(self, other):
-        return partial(_binary_arithmetic, self, other, '/')
+        return partial(operator.div, self, other)
 
     def __truediv__(self, other):
-        return partial(_binary_arithmetic, self, other, '/')
+        return partial(operator.truediv, self, other)
 
     def __lt__(self, other):
-        return partial(_binary_arithmetic, self, other, '<')
+        return partial(operator.lt, self, other)
 
     def __le__(self, other):
-        return partial(_binary_arithmetic, self, other, '<=')
+        return partial(operator.le, self, other)
 
     def __gt__(self, other):
-        return partial(_binary_arithmetic, self, other, '>')
+        return partial(operator.gt, self, other)
 
     def __ge__(self, other):
-        return partial(_binary_arithmetic, self, other, '>=')
+        return partial(operator.ge, self, other)
 
     def __neg__(self):
-        return partial(_unary_arithmetic, self, '-')
+        return partial(operator.neg, self, '-')
 
     def __pos__(self):
-        return partial(_unary_arithmetic, self, '+')
+        return partial(operator.pos, self)
 
     def __abs__(self):
         return partial(abs, self)
@@ -659,7 +624,7 @@ class PartialPlus(_partial, Node):
     def __getitem__(self, item):
         if not isinstance(item, Node):
             item = as_partialplus(item)
-        return partial(_getitem, self, item)
+        return partial(operator.getitem, self, item)
 
     @property
     def pos_args(self):
@@ -796,7 +761,7 @@ def _evaluate(p, instantiate_call=None, bindings=None):
     # When evaluating an expression of the form
     # `list(...)[item]`
     # only evaluate the element(s) of the list that we need.
-    if p.func == _getitem:
+    if p.func == operator.getitem:
         obj, index = p.args
         if isinstance(obj, _partial) and is_sequence_node(obj):
             index_val = recurse(index)
