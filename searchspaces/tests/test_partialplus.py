@@ -1,4 +1,3 @@
-from nose import SkipTest
 from collections import OrderedDict
 from searchspaces.partialplus import partial, Literal
 from searchspaces.partialplus import evaluate, variable
@@ -62,8 +61,9 @@ def test_getitem_dict():
 
 
 def test_switch_dict():
-    """Test that switch works with dicts."""
-    raise SkipTest()  # For now, TODO fixme
+    """
+    Test that "switch" works with dict lookups.
+    """
     def dont_eval():
         # -- This function body should never be evaluated
         #    because we only need the 0'th element of `plist`

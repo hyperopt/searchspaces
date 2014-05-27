@@ -47,6 +47,16 @@ def is_dict_like_node(node):
             issubclass(node.args[0].value, dict))
 
 
+def is_indexable(node):
+    if len(node.args) != 2 or len(node.keywords) > 0:
+        return False
+    obj, index = node.args
+    if is_sequence_node(obj) or is_dict_like_node(obj):
+        return True
+    else:
+        return False
+
+
 def make_list(*args):
     """
     Wrapper for the builtin `list()` that calls it on *args.
@@ -713,6 +723,44 @@ def evaluate(p, **kwargs):
     return _evaluate(p, bindings=kwargs)
 
 
+def _handle_indexing(p, instantiate_call, bindings, recurse):
+    # Assumes is_indexable has already returned True.
+    obj, index = p.args
+    index_val = recurse(index)
+    if is_sequence_node(obj):
+        elem_val = obj.args[index_val]
+        if isinstance(index_val, slice):  # TODO: something more robust?
+            # elem_val is a sliced out sublist, recurse on each element
+            # therein and call obj.func (make_list, make_tuple) on result.
+            elem_val = instantiate_call(obj.func,
+                                        *[recurse(e) for e in elem_val])
+        else:
+            elem_val = recurse(elem_val)
+        try:
+            # bindings the value of this subexpression as
+            int(index_val)
+            bindings[p] = elem_val
+        except TypeError:
+            # TODO: is this even conceivably used?
+            bindings[p] = instantiate_call(p.func, elem_val, index_val)
+    else:  # assumes is_dict_like_node(obj) is True
+        assert obj.func == call_with_list_of_pos_args
+        assert all(is_tuple_node(node) and len(node.args) == 2
+                   for node in obj.args[1:])
+        # TODO: check length better when output-length annotation is supported.
+        keys, values = zip(*(node.args for node in obj.args[1:]))
+        # We could only evaluate as many keys as it takes to find the right
+        # one, but this might make what gets evaluated or not kind of hard
+        # to predict.
+        keys = [recurse(k) for k in keys]
+        try:
+            ind = keys.index(index_val)
+        except ValueError:
+            raise KeyError(index_val)
+        bindings[p] = recurse(values[ind])
+    return bindings[p]
+
+
 def _evaluate(p, instantiate_call=None, bindings=None):
     """
     Evaluate a nested tree of functools.partial objects,
@@ -761,26 +809,8 @@ def _evaluate(p, instantiate_call=None, bindings=None):
     # When evaluating an expression of the form
     # `list(...)[item]`
     # only evaluate the element(s) of the list that we need.
-    if p.func == operator.getitem:
-        obj, index = p.args
-        if isinstance(obj, _partial) and is_sequence_node(obj):
-            index_val = recurse(index)
-            elem_val = obj.args[index_val]
-            if isinstance(index_val, slice):  # TODO: something more robust?
-                # elem_val is a sliced out sublist, recurse on each element
-                # therein and call obj.func (make_list, make_tuple) on result.
-                elem_val = instantiate_call(obj.func,
-                                            *[recurse(e) for e in elem_val])
-            else:
-                elem_val = recurse(elem_val)
-            try:
-                # bindings the value of this subexpression as
-                int(index_val)
-                bindings[p] = elem_val
-            except TypeError:
-                # TODO: is this even conceivably used?
-                bindings[p] = instantiate_call(p.func, elem_val, index_val)
-            return bindings[p]
+    if p.func == operator.getitem and is_indexable(p):
+        return _handle_indexing(p, instantiate_call, bindings, recurse)
     args = [recurse(arg) for arg in p.args]
     kw = (dict((kw, recurse(val)) for kw, val in p.keywords.iteritems())
           if p.keywords else {})
