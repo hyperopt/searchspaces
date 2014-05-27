@@ -6,6 +6,7 @@ from searchspaces.partialplus import as_partialplus as as_pp
 
 
 def test_arithmetic():
+    """Test that arithmetic works properly on PartialPlus objects."""
     def check(a, b):
         assert evaluate(as_pp(partial(int, a)) +
                         as_pp(partial(int, b))) == a + b
@@ -28,12 +29,16 @@ def test_arithmetic():
     yield check, 9, 11
 
 
-def test_switch():
-    """Test the "switch" program structure in partial.evaluate"""
+def test_lazy_index_list():
+    """
+    Test that lazy evaluation of indexing works with element lookups on
+    lists.
+    """
     def dont_eval():
         # -- This function body should never be evaluated
         #    because we only need the 0'th element of `plist`
         assert 0, 'Evaluate does not need this, should not eval'
+
     # TODO: James: I opted for this behaviour rather than list(f, el1, el2...)
     # is there a compelling reason to do that? It kind of breaks with the
     # model.
@@ -41,8 +46,27 @@ def test_switch():
     assert -1 == evaluate(plist[0])
 
 
-def test_switch_range():
-    """Test that "switch" works on index ranges"""
+def test_lazy_index_tuple():
+    """
+    Test that lazy evaluation of indexing works with element lookups on
+    lists.
+    """
+    def dont_eval():
+        # -- This function body should never be evaluated
+        #    because we only need the 0'th element of `plist`
+        assert 0, 'Evaluate does not need this, should not eval'
+
+    # TODO: James: I opted for this behaviour rather than list(f, el1, el2...)
+    # is there a compelling reason to do that? It kind of breaks with the
+    # model.
+    plist = as_pp((-1, partial(dont_eval)))
+    assert -1 == evaluate(plist[0])
+
+
+def test_lazy_index_range():
+    """
+    Test that lazy evaluation of indexing works with range lookups.
+    """
     def dont_eval():
         # -- This function body should never be evaluated
         #    because we only need the 0'th element of `plist`
@@ -55,14 +79,14 @@ def test_switch_range():
 
 
 def test_getitem_dict():
-    """Test that getitem works on a dict."""
+    """Test that indexing works on a PartialPlus'd dict."""
     v = evaluate(as_pp({'a': partial(float, '3'), 'b': 3})['a'])
     assert v == 3.0
 
 
-def test_switch_dict():
+def test_lazy_index_dict():
     """
-    Test that "switch" works with dict lookups.
+    Test that lazy evaluation of indexing works with dict lookups.
     """
     def dont_eval():
         # -- This function body should never be evaluated
@@ -73,8 +97,18 @@ def test_switch_dict():
     assert r == 3
 
 
+def test_switch_ordered_dict():
+    """Test that lazy evaluation works with OrderedDicts."""
+    def dont_eval():
+        # -- This function body should never be evaluated
+        #    because we only need the 0'th element of `plist`
+        assert 0, 'Evaluate does not need this, should not eval'
+    r = evaluate(as_pp(OrderedDict({'a': partial(dont_eval), 'b': 3}))['b'])
+    assert r == 3
+
+
 def test_arg():
-    """Test basic partial.arg lookups"""
+    """Test basic partial.arg lookups."""
     def f(a, b=None):
         return -1
 
@@ -95,7 +129,7 @@ def test_arg():
 
 
 def test_star_args():
-    """Test partial.arg lookups on *args"""
+    """Test partial.arg lookups on *args."""
     def f(a, *b):
         return -1
 
@@ -106,7 +140,7 @@ def test_star_args():
 
 
 def test_kwargs():
-    """Test partial.arg lookups on **kwargs"""
+    """Test partial.arg lookups on **kwargs."""
     def f(a, **b):
         return -1
 
@@ -120,7 +154,7 @@ def test_kwargs():
 
 
 def test_star_kwargs():
-    """Test partial.arg lookups on *args and **kwargs"""
+    """Test partial.arg lookups on *args and **kwargs."""
     def f(a, *u, **b):
         return -1
 
@@ -137,6 +171,7 @@ def test_star_kwargs():
 
 
 def test_tuple():
+    """Test that tuples are correctly traversed/converted."""
     def add(x, y):
         return x + y
 
@@ -147,16 +182,18 @@ def test_tuple():
 
 
 def test_list():
+    """Test that lists are correctly traversed/converted."""
     def sub(x, y):
         return x - y
 
-    x = as_pp(((3, partial(sub, 2, 3)), partial(sub, 5, 7), partial(float, 9)))
+    x = as_pp([[3, partial(sub, 2, 3)], partial(sub, 5, 7), partial(float, 9)])
     y = evaluate(x)
-    assert y == ((3, -1), -2, 9.0)
+    assert y == [[3, -1], -2, 9.0]
     assert isinstance(y[2], float)
 
 
 def test_dict():
+    """Test that dicts are correctly traversed/converted."""
     def mod(x, y):
         return x % y
     x = as_pp({5: partial(mod, 5, 3), 3: (7, 9), 4: [partial(mod, 9, 4)]})
@@ -165,6 +202,7 @@ def test_dict():
 
 
 def test_ordered_dict():
+    """Test that OrderedDicts are correctly traversed/converted."""
     def mod(x, y):
         return x % y
     x = as_pp(OrderedDict({5: partial(mod, 5, 3), 3: (7, 9),
@@ -174,6 +212,7 @@ def test_ordered_dict():
 
 
 def test_depth_first_traversal():
+    """Test that depth-first traversal works."""
     # p1 must appear after either p2 or p3, but not necessarily after both.
     p1 = partial(float, 5.0)
     # p2 must appear after either p3 or p4, but not necessarily after both.
@@ -192,6 +231,7 @@ def test_depth_first_traversal():
 
 
 def test_topological_sort():
+    """Test that topological sort produces a correct partial ordering."""
     # p1 must appear before BOTH p2 and p3.
     p1 = partial(float, 5)
     # p2 must appear before BOTH p3 and p4.
@@ -211,6 +251,10 @@ def test_topological_sort():
 
 
 def test_cycle_detection():
+    """
+    Test that depth_first_traversal and topological_sort correctly
+    find cycles.
+    """
     def assert_raised(graph, fn):
         raised = False
         try:
@@ -249,6 +293,10 @@ def test_cycle_detection():
 
 
 def test_two_objects():
+    """
+    Test that identical expression in different parts of graph evaluates
+    to an identical object.
+    """
     class Foo(object):
         pass
     p = partial(Foo)
@@ -259,6 +307,7 @@ def test_two_objects():
 
 
 def test_variable_substitution():
+    """Test that variable substitution works correctly."""
     x = variable(name='x', value_type=int)
     y = variable(name='y', value_type=float)
     p = as_pp({3: x, x: [y, [y]], y: 4})
@@ -268,9 +317,3 @@ def test_variable_substitution():
     assert e[3] == 'hey'
     assert e['hey'] == [5, [5]]
     assert e[5] == 4
-
-
-if __name__ == "__main__":
-    test_switch()
-    test_switch_range()
-    test_topological_sort()
