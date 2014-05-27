@@ -41,6 +41,11 @@ def is_pos_args_node(node):
     return (hasattr(node, 'func') and node.func is call_with_list_of_pos_args)
 
 
+def is_dict_like_node(node):
+    return (is_pos_args_node(node) and is_literal(node.args[0]) and
+            issubclass(node.args[0].value, dict))
+
+
 def make_list(*args):
     """
     Wrapper for the builtin `list()` that calls it on *args.
