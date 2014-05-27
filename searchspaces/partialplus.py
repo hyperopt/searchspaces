@@ -17,6 +17,10 @@ from itertools import izip, repeat
 # TODO: support o_len functionality from old Apply nodes
 
 
+def is_literal(node):
+    return isinstance(node, Literal)
+
+
 def is_variable_node(node):
     return hasattr(node, 'func') and node.func is variable_node
 
@@ -126,9 +130,12 @@ def as_partialplus(p):
     # Definitely want this to work for OrderedDicts.
     elif isinstance(p, dict):
         # Special-case dictionaries to recurse on values.
-        # TODO: recurse on keys?
-        args = [Literal(p.__class__)] + [as_partialplus((k, v))
-                                         for k, v in p.iteritems()]
+        actual_args = [as_partialplus((k, v)) for k, v in p.iteritems()]
+        # Sort by is_literal in reverse order, so we hit the literal
+        # keys first.
+        actual_args.sort(key=lambda x: is_literal(x[0]), reverse=True)
+        args = [Literal(p.__class__)] + actual_args
+
         return PartialPlus(call_with_list_of_pos_args, *args)
     else:
         return Literal(p)
