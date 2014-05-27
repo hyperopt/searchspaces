@@ -104,6 +104,20 @@ def test_preprocessing():
 
 
 @skip_if_no_module('pylearn2')
+def test_no_preprocessing_raises_when_environ_provided():
+    raised = False
+    try:
+        proxy_to_partialplus(Proxy(callable=dict, positionals=(),
+                                   keywords={'x': '${FOO}'},
+                                   yaml_src=None),
+                             preprocess_strings=False,
+                             environ={'a': 'b'})
+    except ValueError:
+        raised = True
+    assert raised
+
+
+@skip_if_no_module('pylearn2')
 def test_do_not_recurse():
     proxy = Proxy(callable=do_not_recurse, positionals=(),
                   keywords={'value': Proxy(None, None, None, None)},
