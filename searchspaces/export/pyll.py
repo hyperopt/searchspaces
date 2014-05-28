@@ -12,7 +12,8 @@ __all__ = ["as_pyll"]
 try:
     from hyperopt import pyll
 except ImportError:
-    raise ImportError("need hyperopt bro TODO better message")
+    raise ImportError("This functionality requires hyperopt "
+                      "<http://hyperopt.github.io/hyperopt/>")
 
 from ..partialplus import is_tuple_node, is_list_node, is_pos_args_node
 from ..partialplus import topological_sort, Literal
