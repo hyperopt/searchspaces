@@ -18,6 +18,10 @@ from itertools import izip, repeat
 # TODO: support o_len functionality from old Apply nodes
 
 
+def is_choice_node(node):
+    return hasattr(node, 'func') and node.func is choice_node
+
+
 def is_literal(node):
     return isinstance(node, Literal)
 
@@ -85,6 +89,15 @@ def variable_node(*args, **kwargs):
     -----
     By convention we store everything in kwargs.
     """
+
+
+def choice_node(v):
+    return v
+
+
+def choice(choice_var, *args):
+    v = partial(call_with_list_of_pos_args, dict, *args)[choice_var]
+    return partial(choice_node, v)
 
 
 def call_with_list_of_pos_args(f, *args):
