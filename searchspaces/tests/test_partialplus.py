@@ -1,6 +1,6 @@
 from collections import OrderedDict
 import operator
-from searchspaces.partialplus import partial, Literal
+from searchspaces.partialplus import partial, Literal, choice
 from searchspaces.partialplus import evaluate, variable, is_indexable
 from searchspaces.partialplus import depth_first_traversal, topological_sort
 from searchspaces.partialplus import as_partialplus as as_pp
@@ -338,3 +338,29 @@ def test_variable_substitution():
     assert e[3] == 'hey'
     assert e['hey'] == [5, [5]]
     assert e[5] == 4
+
+
+def test_choice():
+    p = choice(partial(int, 15.5), (15, 4), (3, 2))
+    assert evaluate(p) == 4
+    p = choice(variable('x', value_type=['a', 'b', 'c']),
+               ('a', 'b'),
+               ('b', 'c'))
+    assert evaluate(p, x='a') == 'b'
+    assert evaluate(p, x='b') == 'c'
+
+
+def test_choice_raises():
+    raised = False
+    try:
+        choice(5, (5, 4), (3, 2, 1))
+    except ValueError:
+        raised = True
+    assert raised
+
+    raised = False
+    try:
+        choice(5, (5, 4), [3, 4])
+    except ValueError:
+        raised = True
+    assert raised

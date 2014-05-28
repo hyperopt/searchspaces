@@ -96,6 +96,10 @@ def choice_node(v):
 
 
 def choice(choice_var, *args):
+    new_args = [as_partialplus(v) for v in args]
+    # TODO: support len(2) lists as well as len(2) tuples?
+    if any(not is_tuple_node(n) or len(n.args) != 2 for n in new_args):
+        raise ValueError("arguments to choice() must be length-2 tuples")
     v = partial(call_with_list_of_pos_args, dict, *args)[choice_var]
     return partial(choice_node, v)
 
