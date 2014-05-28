@@ -8,18 +8,43 @@ __contact__ = "github.com/hyperopt/hyperopt"
 
 __all__ = ["as_pyll"]
 
+import inspect
+import operator
 
 try:
     from hyperopt import pyll
+    from hyperopt.pyll import stochastic
+
 except ImportError:
     raise ImportError("This functionality requires hyperopt "
                       "<http://hyperopt.github.io/hyperopt/>")
 
-from ..partialplus import is_tuple_node, is_list_node, is_pos_args_node
+from ..partialplus import (is_tuple_node, is_list_node, is_pos_args_node,
+                           is_variable_node)
 from ..partialplus import topological_sort, Literal
 
-# TODO: arithmetic. Is it even necessary?
-# I guess it's useful if the mongoworker doesn't have searchspaces installed.
+
+def _convert_variable(pp_variable):
+    """Convert a PartialPlus variable node into a hyperopt stochastic."""
+    keywords = dict(pp_variable.keywords)
+    distribution = as_pyll(keywords['distribution'])
+    # TODO: None should flag uniform for categoricals
+    if distribution is None:
+        raise ValueError("No distribution specified for variable '%s', can't "
+                         "convert to hyperopt.pyll node")
+    distribution_func = getattr(stochastic, distribution, None)
+    if distribution_func is None:
+        raise ImportError("Couldn't find hyperopt.pyll.stochastic.%s" %
+                          str(distribution))
+    # Hyperopt's convention for distributions
+    keywords['low'] = keywords['minimum']
+    keywords['high'] = keywords['maximum']
+    del keywords['minimum'], keywords['maximum']
+    arg_names = inspect.getargspec(distribution_func).args
+    dist_args = dict((k, as_pyll(keywords[k])) for k in arg_names if k in keywords)
+    return distribution_func(**dist_args)
+
+
 
 
 def _convert_literal(pp_literal):
@@ -74,7 +99,11 @@ def _convert_partialplus(node, bindings):
     """
     args = node.args
     kwargs = node.keywords
-    if is_pos_args_node(node):
+    if is_variable_node(node):
+        # TODO: currrently variables can't have hyper(hyper)parameters
+        # that are partialpluses. Fix this.
+        return _convert_variable(node)
+    elif is_pos_args_node(node):
         assert isinstance(node.args[0], Literal)
         assert hasattr(node.args[0].value, '__call__')
         assert len(kwargs) == 0
