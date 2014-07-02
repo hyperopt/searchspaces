@@ -1,1 +1,1 @@
-from .partialplus import as_partialplus, partial, evaluate
+from .partialplus import as_partialplus, evaluate, choice, partial, variable
