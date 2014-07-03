@@ -24,15 +24,16 @@ from ..partialplus import (is_tuple_node, is_list_node, is_pos_args_node,
 from ..partialplus import topological_sort, Literal
 
 
-def _convert_variable(pp_variable):
+
+def _convert_variable(pp_variable, bindings):
     """Convert a PartialPlus variable node into a hyperopt stochastic."""
     keywords = dict(pp_variable.keywords)
-    distribution = as_pyll(keywords['distribution'])
+    distribution = bindings[keywords['distribution']]
     # TODO: None should flag uniform for categoricals
     if distribution is None:
         raise ValueError("No distribution specified for variable '%s', can't "
                          "convert to hyperopt.pyll node")
-    distribution_func = getattr(stochastic, distribution, None)
+    distribution_func = getattr(stochastic, bindings[distribution], None)
     if distribution_func is None:
         raise ImportError("Couldn't find hyperopt.pyll.stochastic.%s" %
                           str(distribution))
@@ -41,10 +42,9 @@ def _convert_variable(pp_variable):
     keywords['high'] = keywords['maximum']
     del keywords['minimum'], keywords['maximum']
     arg_names = inspect.getargspec(distribution_func).args
-    dist_args = dict((k, as_pyll(keywords[k])) for k in arg_names if k in keywords)
+    dist_args = dict((k, bindings[keywords[k]]) for k in arg_names
+                     if k in keywords)
     return distribution_func(**dist_args)
-
-
 
 
 def _convert_literal(pp_literal):
@@ -102,7 +102,7 @@ def _convert_partialplus(node, bindings):
     if is_variable_node(node):
         # TODO: currrently variables can't have hyper(hyper)parameters
         # that are partialpluses. Fix this.
-        return _convert_variable(node)
+        return _convert_variable(node, bindings)
     elif is_pos_args_node(node):
         assert isinstance(node.args[0], Literal)
         assert hasattr(node.args[0].value, '__call__')
@@ -135,6 +135,8 @@ def as_pyll(root):
     """
     bindings = {}
     for node in reversed(list(topological_sort(root))):
+        if node in bindings:
+            continue
         if isinstance(node, Literal):
             bindings[node] = _convert_literal(node)
         elif is_tuple_node(node) or is_list_node(node):
