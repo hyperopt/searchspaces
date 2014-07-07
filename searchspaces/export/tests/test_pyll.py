@@ -87,6 +87,18 @@ def test_qloguniform_variable():
 
 
 @skip_if_no_module('hyperopt.pyll')
+def test_uniform_categorical():
+    p = as_pyll(variable('foo', value_type=[3, 5, 9]))
+    assert p.name == 'getitem'
+    assert p.pos_args[0].name == 'pos_args'
+    assert p.pos_args[1].name == 'hyperopt_param'
+    assert p.pos_args[1].pos_args[0].name == 'literal'
+    assert p.pos_args[1].pos_args[0].obj == 'foo'
+    assert p.pos_args[1].pos_args[1].name == 'randint'
+
+
+
+@skip_if_no_module('hyperopt.pyll')
 def test_pyll_tuple():
     x = as_partialplus((6, 9, 4))
     y = as_pyll(x)

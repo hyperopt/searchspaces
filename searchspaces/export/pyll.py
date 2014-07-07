@@ -20,10 +20,26 @@ except ImportError:
     raise ImportError("This functionality requires hyperopt "
                       "<http://hyperopt.github.io/hyperopt/>")
 
-from ..partialplus import (is_literal, is_variable_node, is_sequence_node,
-                           is_pos_args_node)
+from ..partialplus import (is_sequence_of_literals, is_sequence_node,
+                           is_pos_args_node, is_variable_node, is_choice_node,
+                           is_literal, is_uniform_categorical,
+                           is_weighted_categorical)
 from ..partialplus import topological_sort, Literal
 
+
+def _convert_uniform_categorical(pp_var, bindings):
+    # Already know it's a variable node.
+    val_type = pp_var.keywords['value_type']
+    assert is_sequence_of_literals(val_type), \
+        "val_type for categorical must be sequence of literals"
+    n_choices = len(val_type.args)
+    assert is_literal(pp_var.keywords['name'])
+    randint = hp.randint(pp_var.keywords['name'].value, n_choices)
+    return bindings[val_type][randint]
+
+
+def _convert_weighted_categorical(pp_var, bindings):
+    raise NotImplementedError()
 
 
 def _convert_variable(pp_variable, bindings):
@@ -35,8 +51,10 @@ def _convert_variable(pp_variable, bindings):
     assert isinstance(distribution, pyll.base.Literal)
     assert isinstance(distribution.obj, (basestring, types.NoneType))
     # Special handling for categoricals.
-    if distribution.obj == 'categorical':
-        raise NotImplementedError()
+    if is_weighted_categorical(pp_variable):
+        return _convert_weighted_categorical(pp_variable, bindings)
+    elif is_uniform_categorical(pp_variable):
+        return _convert_uniform_categorical(pp_variable, bindings)
     else:
         inspectable_func = getattr(pyll.stochastic, distribution.obj, None)
         hp_func = getattr(hp, distribution.obj, None)

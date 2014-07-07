@@ -18,8 +18,37 @@ from itertools import izip, repeat
 # TODO: support o_len functionality from old Apply nodes
 
 
+def is_sequence_of_literals(node):
+    return is_sequence_node(node) and all(is_literal(n) for n in node.args)
+
+
 def is_choice_node(node):
     return hasattr(node, 'func') and node.func is choice_node
+
+
+
+def is_weighted_categorical(node):
+    if not is_variable_node(node):
+        return False
+    elif node.keywords['distribution'].value == 'categorical':
+        assert is_sequence_of_literals(node.keywords['value_type'])
+        return 'p' in node.keywords
+    else:
+        return False
+
+
+def is_uniform_categorical(node):
+    if not is_variable_node(node):
+        return False
+    elif (node.keywords['distribution'].value == 'categorical'
+          and 'p' not in node.keywords):
+        assert is_sequence_of_literals(node.keywords['value_type'])
+        return True
+    elif node.keywords['distribution'].value is None:
+        # TODO: is_iterable?
+        if is_sequence_node(node.keywords['value_type']):
+            return True
+    return False
 
 
 def is_literal(node):
