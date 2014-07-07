@@ -67,7 +67,6 @@ def _convert_variable(pp_variable, bindings):
     # Use the name as the label.
     assert is_literal(pp_variable.keywords['name'])
     # Hyperopt's convention for distributions
-    keywords['label'] = keywords['name']
     keywords['low'] = keywords['minimum']
     keywords['high'] = keywords['maximum']
     if is_literal(keywords['maximum']):
@@ -92,7 +91,7 @@ def _convert_variable(pp_variable, bindings):
         # TODO: check for integer upper value?
     dist_args = dict((k, bindings[keywords[k]]) for k in arg_names
                      if k in keywords)
-    dist_args['label'] = bindings[keywords['label']]
+    dist_args['label'] = bindings[keywords['name']]
     return hp_func(**dist_args)
 
 
