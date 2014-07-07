@@ -22,24 +22,24 @@ except ImportError:
 
 from ..partialplus import (is_sequence_of_literals, is_sequence_node,
                            is_pos_args_node, is_variable_node, is_choice_node,
-                           is_literal, is_uniform_categorical,
-                           is_weighted_categorical)
+                           is_literal, is_categorical)
 from ..partialplus import topological_sort, Literal
 
 
-def _convert_uniform_categorical(pp_var, bindings):
-    # Already know it's a variable node.
+def _convert_categorical(pp_var, bindings):
     val_type = pp_var.keywords['value_type']
     assert is_sequence_of_literals(val_type), \
         "val_type for categorical must be sequence of literals"
     n_choices = len(val_type.args)
     assert is_literal(pp_var.keywords['name'])
-    randint = hp.randint(pp_var.keywords['name'].value, n_choices)
+    if 'p' in pp_var.keywords:
+        p = pp_var.keywords['p']
+        randint_stoch = pyll.scope.categorical(bindings[p], upper=n_choices)
+        name = bindings[pp_var.keywords['name']]
+        randint = pyll.scope.hyperopt_param(name, randint_stoch)
+    else:
+        randint = hp.randint(bindings[pp_var.keywords['name']], n_choices)
     return bindings[val_type][randint]
-
-
-def _convert_weighted_categorical(pp_var, bindings):
-    raise NotImplementedError()
 
 
 def _convert_variable(pp_variable, bindings):
@@ -51,10 +51,8 @@ def _convert_variable(pp_variable, bindings):
     assert isinstance(distribution, pyll.base.Literal)
     assert isinstance(distribution.obj, (basestring, types.NoneType))
     # Special handling for categoricals.
-    if is_weighted_categorical(pp_variable):
-        return _convert_weighted_categorical(pp_variable, bindings)
-    elif is_uniform_categorical(pp_variable):
-        return _convert_uniform_categorical(pp_variable, bindings)
+    if is_categorical(pp_variable):
+        return _convert_categorical(pp_variable, bindings)
     else:
         inspectable_func = getattr(pyll.stochastic, distribution.obj, None)
         hp_func = getattr(hp, distribution.obj, None)
@@ -77,7 +75,9 @@ def _convert_variable(pp_variable, bindings):
                              else maximum)
         bindings[keywords['upper']] = _convert_literal(keywords['upper'])
     else:
-        keywords['upper'] = keywords['maximum'] + 1
+        one = Literal(1)
+        bindings[one] = _convert_literal(one)
+        keywords['upper'] = keywords['maximum'] + one
         bindings[keywords['upper']] = _convert_partialplus(keywords['upper'],
                                                            bindings)
     del keywords['minimum'], keywords['maximum']
@@ -104,37 +104,32 @@ def _convert_choice(pp_choice, bindings):
     assert len(getitem_node.args) == 2
     choices, index = getitem_node.args
     assert is_variable_node(index), "non-variable node encountered in choice"
-    if is_uniform_categorical(index):
-        assert is_pos_args_node(choices)
-        assert all(is_sequence_node(p) and
-                   len(p.args) == 2 for p in choices.args[1:]), \
-            "Expected a sequence of pairs in choice list"
-        if not all(is_literal(c.args[0]) for c in choices.args[1:]):
-            raise ValueError("Need all keys in choice list to be literals "
-                             "(not computed)")
-        assert bindings[index].name == 'getitem'
-        # Pull out the randint from the previously converted uniform
-        # categorical.
-        randint_node = bindings[index].pos_args[1]
-        # Assumes value type is list of literals; _convert_uniform_categorical
-        # would have already failed if not. Can probably remove this assertion.
-        assert is_sequence_of_literals(index.keywords['value_type'])
-        val_type_keys = [k.value for k in index.keywords['value_type'].args]
-        c_keys, c_values = [list(x) for x in zip(*((c.args[0].value, c.args[1])
-                                                   for c in choices.args[1:]))]
-        assert (len(val_type_keys) == len(c_keys) and  # small optimization
-                len(set(val_type_keys).symmetric_difference(c_keys))) == 0, \
-            "values %s taken on by categorical not same as choices %s" % (
-                str(val_type_keys), str(c_keys)
-            )
-        value_idx_lookup = [c_values[c_keys.index(v)] for v in val_type_keys]
-        hopt_values = [bindings[v] for v in value_idx_lookup]
-        return pyll.scope.switch(randint_node, *hopt_values)
-    elif is_weighted_categorical(index):
-        raise NotImplementedError()
-    else:
-        raise NotImplementedError("choice() conversion to pyll currently "
-                                  "requires a categorical index")
+    assert is_categorical(index), ("choice() conversion to pyll currently "
+                                   "requires a categorical index")
+    assert is_pos_args_node(choices)
+    assert all(is_sequence_node(p) and
+               len(p.args) == 2 for p in choices.args[1:]), \
+        "Expected a sequence of pairs in choice list"
+    if not all(is_literal(c.args[0]) for c in choices.args[1:]):
+        raise ValueError("Need all keys in choice list to be literals "
+                         "(not computed)")
+    assert bindings[index].name == 'getitem'
+    # Pull out the randint from the previously converted categorical.
+    randint_node = bindings[index].pos_args[1]
+    # Assumes value type is list of literals; _convert_uniform_categorical
+    # would have already failed if not. Can probably remove this assertion.
+    assert is_sequence_of_literals(index.keywords['value_type'])
+    val_type_keys = [k.value for k in index.keywords['value_type'].args]
+    c_keys, c_values = [list(x) for x in zip(*((c.args[0].value, c.args[1])
+                                                for c in choices.args[1:]))]
+    assert (len(val_type_keys) == len(c_keys) and  # small optimization
+            len(set(val_type_keys).symmetric_difference(c_keys))) == 0, \
+        "values %s taken on by categorical not same as choices %s" % (
+            str(val_type_keys), str(c_keys)
+        )
+    value_idx_lookup = [c_values[c_keys.index(v)] for v in val_type_keys]
+    hopt_values = [bindings[v] for v in value_idx_lookup]
+    return pyll.scope.switch(randint_node, *hopt_values)
 
 
 def _convert_literal(pp_literal):

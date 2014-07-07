@@ -1,3 +1,6 @@
+import operator
+import numpy as np
+
 from searchspaces.partialplus import (
     partial, as_partialplus, evaluate, choice, variable
 )
@@ -5,6 +8,7 @@ from searchspaces.test_utils import skip_if_no_module
 try:
     from searchspaces.export.pyll import as_pyll
     from hyperopt.pyll import rec_eval, scope
+    from hyperopt.pyll.stochastic import recursive_set_rng_kwarg
 except ImportError:
     pass
 
@@ -25,6 +29,14 @@ def test_randint():
     assert p.pos_args[0].obj == 'some_random_int'
     assert p.pos_args[1].name == 'randint'
     assert p.pos_args[1].arg['upper'].obj == 6
+    # upper is not a constant
+    v2 = variable('some_other_int', value_type=int, distribution='randint',
+                  maximum=partial(operator.add, 2, 3))
+    p2 = as_pyll(v2)
+    assert p2.name == 'hyperopt_param'
+    assert p2.pos_args[0].obj == 'some_other_int'
+    assert p2.pos_args[1].name == 'randint'
+    assert p2.pos_args[1].arg['upper'].name == 'add'
 
 
 def check_continuous_variable(label, dist_name, **params):
@@ -94,25 +106,90 @@ def test_qloguniform_variable():
 
 
 @skip_if_no_module('hyperopt.pyll')
+def test_nonuniform_categorical():
+    p = as_pyll(variable('baz', value_type=[3, 5, 9],
+                         distribution='categorical',
+                         p=[0.1, 0.4, 0.5]))
+    assert p.name == 'getitem'
+    assert p.pos_args[0].name == 'pos_args'
+    assert p.pos_args[1].name == 'hyperopt_param'
+    assert p.pos_args[1].pos_args[0].name == 'literal'
+    assert p.pos_args[1].pos_args[0].obj == 'baz'
+    assert p.pos_args[1].pos_args[1].name == 'categorical'
+    assert p.pos_args[1].pos_args[1].arg['p'].name == 'pos_args'
+    assert p.pos_args[1].pos_args[1].arg['p'].pos_args[0].obj == 0.1
+    assert p.pos_args[1].pos_args[1].arg['p'].pos_args[1].obj == 0.4
+    assert p.pos_args[1].pos_args[1].arg['p'].pos_args[2].obj == 0.5
+    # Make sure this executes and yields a value in the right domain.
+    recursive_set_rng_kwarg(p, np.random)
+    try:
+        values = [rec_eval(p) for _ in xrange(10)]
+    except Exception:
+        assert False
+    assert all(v in [3, 5, 9] for v in values)
+
+
+@skip_if_no_module('hyperopt.pyll')
 def test_uniform_categorical():
-    p = as_pyll(variable('foo', value_type=[3, 5, 9]))
+    p = as_pyll(variable('foo', value_type=[-1, 1, 4]))
     assert p.name == 'getitem'
     assert p.pos_args[0].name == 'pos_args'
     assert p.pos_args[1].name == 'hyperopt_param'
     assert p.pos_args[1].pos_args[0].name == 'literal'
     assert p.pos_args[1].pos_args[0].obj == 'foo'
     assert p.pos_args[1].pos_args[1].name == 'randint'
+    # Make sure this executes and yields a value in the right domain.
+    recursive_set_rng_kwarg(p, np.random)
+    try:
+        values = [rec_eval(p) for _ in xrange(10)]
+    except Exception:
+        assert False
+    assert all(v in [-1, 1, 4] for v in values)
 
 
 @skip_if_no_module('hyperopt.pyll')
-def test_choice():
-    p = as_pyll(choice(variable('foo', value_type=[3, 5, 9]),
-                       (3, 'abc'),
-                       (5, 'def'),
-                       (9, 'ghi')))
+def test_nonuniform_choice():
+    var = variable('blu', value_type=[2, 4, 8], distribution='categorical',
+                   p=[0.2, 0.7, 0.1])
+    p = as_pyll(choice(var,
+                       (2, 'abc'),
+                       (4, 'def'),
+                       (8, 'ghi')))
+    assert p.name == 'switch'
+    assert p.pos_args[0].name == 'hyperopt_param'
+    assert p.pos_args[0].pos_args[0].obj == 'blu'
+    assert p.pos_args[0].pos_args[1].name == 'categorical'
+    assert p.pos_args[0].pos_args[1].arg['p'].name == 'pos_args'
+    assert p.pos_args[0].pos_args[1].arg['p'].pos_args[0].obj == 0.2
+    assert p.pos_args[0].pos_args[1].arg['p'].pos_args[1].obj == 0.7
+    assert p.pos_args[0].pos_args[1].arg['p'].pos_args[2].obj == 0.1
+    # Make sure this executes and yields a value in the right domain.
+    recursive_set_rng_kwarg(p, np.random)
+    try:
+        values = [rec_eval(p) for _ in xrange(10)]
+    except Exception:
+        assert False
+    assert all(v in ['abc', 'def', 'ghi'] for v in values)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_uniform_choice():
+    p = as_pyll(choice(variable('foo', value_type=[7, 9, 11]),
+                       (7, 'rst'),
+                       (9, 'uvw'),
+                       (11, 'xyz')))
     assert p.name == 'switch'
     assert p.pos_args[0].name == 'hyperopt_param'
     assert p.pos_args[0].pos_args[0].obj == 'foo'
+    assert p.pos_args[0].pos_args[1].name == 'randint'
+    assert p.pos_args[0].pos_args[1].arg['upper'].obj == 3
+    # Make sure this executes and yields a value in the right domain.
+    recursive_set_rng_kwarg(p, np.random)
+    try:
+        values = [rec_eval(p) for _ in xrange(10)]
+    except Exception:
+        assert False
+    assert all(v in ['rst', 'uvw', 'xyz'] for v in values)
 
 
 @skip_if_no_module('hyperopt.pyll')

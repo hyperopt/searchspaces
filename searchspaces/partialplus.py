@@ -26,8 +26,10 @@ def is_choice_node(node):
     return hasattr(node, 'func') and node.func is choice_node
 
 
+def is_categorical(node):
+    return is_nonuniform_categorical(node) or is_uniform_categorical(node)
 
-def is_weighted_categorical(node):
+def is_nonuniform_categorical(node):
     if not is_variable_node(node):
         return False
     elif node.keywords['distribution'].value == 'categorical':
