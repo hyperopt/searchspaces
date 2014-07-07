@@ -163,7 +163,6 @@ def test_dict():
                             'y': partial(float, 3)
                             })
         y = as_pyll(x)
-        print y
         assert evaluate(x) == rec_eval(y)
 
 

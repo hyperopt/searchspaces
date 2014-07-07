@@ -147,6 +147,7 @@ def _convert_partialplus(node, bindings):
     """
     args = node.args
     kwargs = node.keywords
+    # Convert substitutable variable nodes.
     if is_variable_node(node):
         # TODO: currrently variables can't have hyper(hyper)parameters
         # that are partialpluses. Fix this.
@@ -163,7 +164,10 @@ def _convert_partialplus(node, bindings):
     else:
         f = node.func
         args = [bindings[p] for p in args]
-        kwargs = dict((k, bindings[v]) for k, v in kwargs.items())
+        kwargs = dict((k, bindings[v]) for k, v in kwargs.iteritems())
+    # In any case, add the function to the scope object if need be and create
+    # an equivalent Apply node. define_params tells us what setup we need to
+    # do when this node if and when this node is deserialized.
     f = pyll.scope.define_if_new(f)
     apply_node = getattr(pyll.scope, f.__name__)(*args, **kwargs)
     apply_node.define_params = {'f': f}
