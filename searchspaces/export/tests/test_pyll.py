@@ -1,10 +1,89 @@
-from searchspaces.partialplus import partial, as_partialplus, evaluate
+from searchspaces.partialplus import (
+    partial, as_partialplus, evaluate, choice, variable
+)
 from searchspaces.test_utils import skip_if_no_module
 try:
     from searchspaces.export.pyll import as_pyll
     from hyperopt.pyll import rec_eval, scope
 except ImportError:
     pass
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_randint():
+    v = variable('some_random_int', value_type=int, distribution='randint',
+                 maximum=5)
+    p = as_pyll(v)
+    assert p.name == 'hyperopt_param'
+    assert p.pos_args[0].obj == 'some_random_int'
+    assert p.pos_args[1].name == 'randint'
+    assert p.pos_args[1].arg['upper'].obj == 6
+
+
+def check_continuous_variable(label, dist_name, **params):
+    v = variable(label, value_type=float, distribution=dist_name,
+                 **params)
+    p = as_pyll(v)
+    assert p.name == 'float'  # Implementation detail
+    assert p.pos_args[0].name == 'hyperopt_param'
+    assert p.pos_args[0].pos_args[0].obj == label
+    assert p.pos_args[0].pos_args[1].name == dist_name
+    if 'minimum' in params:
+        params['low'] = params['minimum']
+        del params['minimum']
+    if 'maximum' in params:
+        params['high'] = params['maximum']
+        del params['maximum']
+    for key in params:
+        assert p.pos_args[0].pos_args[1].arg[key].obj == params[key]
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_normal_variable():
+    check_continuous_variable('some_normal_thing', 'normal',
+                              mu=5, sigma=9)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_lognormal_variable():
+    check_continuous_variable('some_lognormal_thing', 'lognormal',
+                              mu=3, sigma=14)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_qnormal_variable():
+    check_continuous_variable('some_quantized_normal_thing', 'qnormal',
+                              mu=2.7, sigma=3.5, q=2)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_qlognormal_variable():
+    check_continuous_variable('some_quantized_lognormal_thing', 'qlognormal',
+                              mu=4.444, sigma=5.0, q=2)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_uniform_variable():
+    check_continuous_variable('some_uniform_thing', 'uniform',
+                              minimum=0, maximum=5)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_loguniform_variable():
+    check_continuous_variable('some_loguniform_thing', 'loguniform',
+                              minimum=7, maximum=9)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_quniform_variable():
+    check_continuous_variable('some_quantized_uniform_thing', 'quniform',
+                              minimum=44, maximum=55)
+
+
+@skip_if_no_module('hyperopt.pyll')
+def test_qloguniform_variable():
+    check_continuous_variable('some_quantized_loguniform_thing', 'qloguniform',
+                              minimum=-532, maximum=66)
 
 
 @skip_if_no_module('hyperopt.pyll')

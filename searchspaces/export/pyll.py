@@ -10,17 +10,18 @@ __all__ = ["as_pyll"]
 
 import inspect
 import operator
+import types
+
 
 try:
-    from hyperopt import pyll
-    from hyperopt.pyll import stochastic
+    from hyperopt import pyll, hp
 
 except ImportError:
     raise ImportError("This functionality requires hyperopt "
                       "<http://hyperopt.github.io/hyperopt/>")
 
-from ..partialplus import (is_tuple_node, is_list_node, is_pos_args_node,
-                           is_variable_node)
+from ..partialplus import (is_literal, is_variable_node, is_sequence_node,
+                           is_pos_args_node)
 from ..partialplus import topological_sort, Literal
 
 
@@ -29,22 +30,52 @@ def _convert_variable(pp_variable, bindings):
     """Convert a PartialPlus variable node into a hyperopt stochastic."""
     keywords = dict(pp_variable.keywords)
     distribution = bindings[keywords['distribution']]
-    # TODO: None should flag uniform for categoricals
-    if distribution is None:
-        raise ValueError("No distribution specified for variable '%s', can't "
-                         "convert to hyperopt.pyll node")
-    distribution_func = getattr(stochastic, bindings[distribution], None)
-    if distribution_func is None:
-        raise ImportError("Couldn't find hyperopt.pyll.stochastic.%s" %
-                          str(distribution))
+    # This literal constraint is necessary so we can create the right kind of
+    # node at conversion time.
+    assert isinstance(distribution, pyll.base.Literal)
+    assert isinstance(distribution.obj, (basestring, types.NoneType))
+    # Special handling for categoricals.
+    if distribution.obj == 'categorical':
+        raise NotImplementedError()
+    else:
+        inspectable_func = getattr(pyll.stochastic, distribution.obj, None)
+        hp_func = getattr(hp, distribution.obj, None)
+        if inspectable_func is None:
+            raise ImportError("Couldn't find hyperopt.pyll.stochastic.%s" %
+                              str(distribution))
+        if hp_func is None:
+            raise ImportError("Couldn't find hyperopt.hp.%s" %
+                              str(distribution))
+    # Use the name as the label.
+    assert is_literal(pp_variable.keywords['name'])
     # Hyperopt's convention for distributions
+    keywords['label'] = keywords['name']
     keywords['low'] = keywords['minimum']
     keywords['high'] = keywords['maximum']
+    if is_literal(keywords['maximum']):
+        # TODO: Literal should have arithmetic capabilities.
+        maximum = keywords['maximum']
+        keywords['upper'] = (Literal(maximum.value + 1)
+                             if maximum.value is not None
+                             else maximum)
+        bindings[keywords['upper']] = _convert_literal(keywords['upper'])
+    else:
+        keywords['upper'] = keywords['maximum'] + 1
+        bindings[keywords['upper']] = _convert_partialplus(keywords['upper'],
+                                                           bindings)
     del keywords['minimum'], keywords['maximum']
-    arg_names = inspect.getargspec(distribution_func).args
+    arg_names = inspect.getargspec(inspectable_func).args
+    if distribution.obj == 'randint':
+        assert 'low' not in keywords or (
+            is_literal(keywords['low']) and keywords['low'].value is None
+        ), (
+            "nonzero minimum not supported by hyperopt randint"
+        )
+        # TODO: check for integer upper value?
     dist_args = dict((k, bindings[keywords[k]]) for k in arg_names
                      if k in keywords)
-    return distribution_func(**dist_args)
+    dist_args['label'] = bindings[keywords['label']]
+    return hp_func(**dist_args)
 
 
 def _convert_literal(pp_literal):
