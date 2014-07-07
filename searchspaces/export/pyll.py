@@ -138,8 +138,6 @@ def as_pyll(root):
     """
     bindings = {}
     for node in reversed(list(topological_sort(root))):
-        if node in bindings:
-            continue
         if isinstance(node, Literal):
             bindings[node] = _convert_literal(node)
         else:
