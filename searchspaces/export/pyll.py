@@ -103,6 +103,9 @@ def _convert_partialplus(node, bindings):
         # TODO: currrently variables can't have hyper(hyper)parameters
         # that are partialpluses. Fix this.
         return _convert_variable(node, bindings)
+    elif is_sequence_node(node):
+        return _convert_sequence(node, bindings)
+    # Convert the pos_args node for, e.g. dictionaries.
     elif is_pos_args_node(node):
         assert isinstance(node.args[0], Literal)
         assert hasattr(node.args[0].value, '__call__')
@@ -139,8 +142,6 @@ def as_pyll(root):
             continue
         if isinstance(node, Literal):
             bindings[node] = _convert_literal(node)
-        elif is_tuple_node(node) or is_list_node(node):
-            bindings[node] = _convert_sequence(node, bindings)
         else:
             bindings[node] = _convert_partialplus(node, bindings)
     return bindings[root]
