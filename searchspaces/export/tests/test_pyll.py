@@ -10,6 +10,13 @@ except ImportError:
 
 
 @skip_if_no_module('hyperopt.pyll')
+def test_repeated_node():
+    q = partial(float, 5)
+    p = as_pyll(as_partialplus([q, q, [q]]))
+    assert p.pos_args[0] is p.pos_args[1]
+    assert p.pos_args[0] is p.pos_args[2].pos_args[0]
+
+
 def test_randint():
     v = variable('some_random_int', value_type=int, distribution='randint',
                  maximum=5)
