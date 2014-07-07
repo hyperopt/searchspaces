@@ -97,6 +97,16 @@ def test_uniform_categorical():
     assert p.pos_args[1].pos_args[1].name == 'randint'
 
 
+@skip_if_no_module('hyperopt.pyll')
+def test_choice():
+    p = as_pyll(choice(variable('foo', value_type=[3, 5, 9]),
+                       (3, 'abc'),
+                       (5, 'def'),
+                       (9, 'ghi')))
+    assert p.name == 'switch'
+    assert p.pos_args[0].name == 'hyperopt_param'
+    assert p.pos_args[0].pos_args[0].obj == 'foo'
+
 
 @skip_if_no_module('hyperopt.pyll')
 def test_pyll_tuple():

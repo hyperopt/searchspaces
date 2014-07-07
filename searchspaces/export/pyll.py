@@ -95,6 +95,48 @@ def _convert_variable(pp_variable, bindings):
     return hp_func(**dist_args)
 
 
+def _convert_choice(pp_choice, bindings):
+    """
+    Convert a PartialPlus `choice` node into a hyperopt `switch`.
+    """
+    getitem_node = pp_choice.args[0]
+    assert getitem_node.func == operator.getitem
+    assert len(getitem_node.args) == 2
+    choices, index = getitem_node.args
+    assert is_variable_node(index), "non-variable node encountered in choice"
+    if is_uniform_categorical(index):
+        assert is_pos_args_node(choices)
+        assert all(is_sequence_node(p) and
+                   len(p.args) == 2 for p in choices.args[1:]), \
+            "Expected a sequence of pairs in choice list"
+        if not all(is_literal(c.args[0]) for c in choices.args[1:]):
+            raise ValueError("Need all keys in choice list to be literals "
+                             "(not computed)")
+        assert bindings[index].name == 'getitem'
+        # Pull out the randint from the previously converted uniform
+        # categorical.
+        randint_node = bindings[index].pos_args[1]
+        # Assumes value type is list of literals; _convert_uniform_categorical
+        # would have already failed if not. Can probably remove this assertion.
+        assert is_sequence_of_literals(index.keywords['value_type'])
+        val_type_keys = [k.value for k in index.keywords['value_type'].args]
+        c_keys, c_values = [list(x) for x in zip(*((c.args[0].value, c.args[1])
+                                                   for c in choices.args[1:]))]
+        assert (len(val_type_keys) == len(c_keys) and  # small optimization
+                len(set(val_type_keys).symmetric_difference(c_keys))) == 0, \
+            "values %s taken on by categorical not same as choices %s" % (
+                str(val_type_keys), str(c_keys)
+            )
+        value_idx_lookup = [c_values[c_keys.index(v)] for v in val_type_keys]
+        hopt_values = [bindings[v] for v in value_idx_lookup]
+        return pyll.scope.switch(randint_node, *hopt_values)
+    elif is_weighted_categorical(index):
+        raise NotImplementedError()
+    else:
+        raise NotImplementedError("choice() conversion to pyll currently "
+                                  "requires a categorical index")
+
+
 def _convert_literal(pp_literal):
     """Convert a searchspaces Literal to a hyperopt Literal."""
     return pyll.as_apply(pp_literal.value)
@@ -161,6 +203,8 @@ def _convert_partialplus(node, bindings):
         assert len(kwargs) == 0
         f = args[0].value
         args = [pyll.as_apply([bindings[p] for p in args[1:]])]
+    elif is_choice_node(node):
+        return _convert_choice(node, bindings)
     else:
         f = node.func
         args = [bindings[p] for p in args]
