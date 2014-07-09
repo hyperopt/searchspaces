@@ -19,7 +19,9 @@ from itertools import izip, repeat
 
 
 def is_sequence_of_literals(node):
-    return is_sequence_node(node) and all(is_literal(n) for n in node.args)
+    return is_sequence_node(node) and all(is_literal(n) or
+                                          is_sequence_of_literals(n)
+                                          for n in node.args)
 
 
 def is_choice_node(node):
@@ -28,6 +30,7 @@ def is_choice_node(node):
 
 def is_categorical(node):
     return is_nonuniform_categorical(node) or is_uniform_categorical(node)
+
 
 def is_nonuniform_categorical(node):
     if not is_variable_node(node):
